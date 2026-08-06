@@ -3,6 +3,8 @@ const cors = require('cors');
 const app = express();
 const mysql2 = require('mysql2');
 const PORT = 3001;
+const bcrypt = require('bcrypt');
+const saltRounds = 10;
 
 app.use(cors());
 app.use(express.json());
@@ -33,6 +35,17 @@ app.get('/produk', (req, res) => {
     const sql = 'SELECT * FROM produk';
     db.query(sql, (err, results) => {
         if (err) return res.status(500).json({ error: err });
+        res.json(results);
+    });
+});
+
+app.get('/produk/:id_produk', (req, res) => {
+    const { id_produk } = req.params;
+    const sql = 'SELECT * FROM produk WHERE id_produk =?';
+    db.query(sql, [id_produk], (err, results) => {
+        if (err) { 
+            return res.status(500).json({ error: err });
+        }
         res.json(results);
     });
 });
@@ -108,6 +121,41 @@ app.get('/kategori', (req, res) => {
     });
 });
 // ======================================== //
+
+// ============== POST pengguna =============== //
+app.post ('/pengguna', async (req, res) => {
+    const { nama, email, password, no_hp } = req.body;
+
+    if (!nama || !email || !password) {
+        return res.status(400).json({message: "nama, Email, dan Password wajib diisi duluu"});
+    }
+
+    try {
+        const hashedPassword = await bcrypt.hash(password, saltRounds);
+        const sql = 'INSERT INTO pengguna (nama, email, password, no_hp) VALUES (?, ?, ?, ?)';
+        db.query(sql, [nama, email, hashedPassword, no_hp], (err, result) => {
+             if (err) {
+                if (err.code === 'ER_DUP_ENTRY') {
+                    return res.status(400).json({
+                        message: 'Email sudah terdaftar, gunakan email lain'
+                    });
+                }
+                return res.status(500).json({
+                    error: err.sqlMessage
+                });
+            }
+
+            res.json({
+                message: 'Akun berhasil dibuat!',
+                id_pengguna: result.insertId
+            });
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Gagal mengenkripsi password' });
+    }
+});
+// ======================================== //
+
 
 app.listen(PORT, () => {
     console.log(`Server GlowList jalan di http://localhost:${PORT}`);
