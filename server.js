@@ -4,6 +4,8 @@ const app = express();
 const mysql2 = require('mysql2');
 const PORT = 3001;
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const authJWT = require('./middleware');
 const saltRounds = 10;
 
 app.use(cors());
@@ -75,7 +77,7 @@ app.post('/produk', (req, res) => {
 // ======================================== //
 
 // ============== PUT produk =============== //
-app.put('/produk/:id_produk', (req, res) => {
+app.put('/produk/:id_produk', authJWT, (req, res) => {
     const { id_produk } = req.params;
     const { judul, deskripsi, harga, id_kategori } = req.body;
 
@@ -97,7 +99,7 @@ app.put('/produk/:id_produk', (req, res) => {
 // ======================================== //
 
 // ============== DELETE produk =============== //
-app.delete('/produk/:id_produk', (req, res) => {
+app.delete('/produk/:id_produk', authJWT, (req, res) => {
     const { id_produk } = req.params;
     const sql = 'DELETE FROM produk WHERE id_produk = ?';
     db.query(sql, [id_produk], (err, result) => {
@@ -155,6 +157,41 @@ app.post ('/pengguna', async (req, res) => {
     }
 });
 // ======================================== //
+
+// ============== LOGIN pengguna =============== //
+app.post('/login', (req, res) => {
+    const { email, password } = req.body;
+    const sql = 'SELECT * FROM pengguna WHERE email = ?';
+
+    db.query(sql, [email], (err, result) => {
+        if (err) return res.status(500).json({ error: err.sqlMessage });
+        if (result.length === 0) {
+            return res.status(404).json({ message: 'Akun tidak ditemukan' });
+        }
+
+        const user = result[0];
+        const passwordIsValid = bcrypt.compareSync(password, user.password);
+
+        if (!passwordIsValid) {
+            return res.status(401).json({ message: 'Password salah' });
+        }
+
+        const token = jwt.sign(
+            { id: user.id_pengguna },
+            'glowlistrahasia',
+            { expiresIn: 86400 }
+        );
+
+        res.status(200).json({
+            auth: true,
+            token,
+            id_pengguna: user.id_pengguna,
+            nama: user.nama
+        });
+    });
+});
+// ======================================== //
+
 
 
 app.listen(PORT, () => {
